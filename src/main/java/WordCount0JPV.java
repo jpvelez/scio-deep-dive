@@ -39,6 +39,15 @@ public class WordCount0JPV {
         p
                 .apply(Create.of(input))
                 .apply(ParDo.of(new WordParser()))
+                .apply(ParDo.of(new DoFn<String, String>() {
+                    @ProcessElement
+                    public void processElement(ProcessContext c) {
+                        String word = c.element();
+                        if (!word.isEmpty()) {
+                            c.output(word);
+                        }
+                    }
+                }))
                 .apply(Count.perElement())
                 .apply(ParDo.of(new DoFn<KV<String,Long>, String>() {
                     @ProcessElement
