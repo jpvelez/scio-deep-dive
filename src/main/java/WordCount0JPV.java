@@ -39,7 +39,15 @@ public class WordCount0JPV {
 
         PCollection<String> result =  p
                 .apply(Create.of(input))
-                .apply(ParDo.of(new WordParser()))
+                .apply(ParDo.of(new DoFn<String, String>() {
+                    @ProcessElement
+                    public void processElement(ProcessContext c) {
+                        String line = c.element();
+                        for (String word : line.toLowerCase().split(" ")) {
+                            c.output(word);
+                        }
+                    }
+                }))
                 .apply(ParDo.of(new DoFn<String, String>() {
                     @ProcessElement
                     public void processElement(ProcessContext c) {
@@ -63,15 +71,5 @@ public class WordCount0JPV {
         PAssert.that(result).containsInAnyOrder(expected);
 
         p.run().waitUntilFinish();
-    }
-
-    public static class WordParser extends DoFn<String, String> {
-        @ProcessElement
-        public void processElement(ProcessContext c) {
-            String line = c.element();
-            for (String word : line.toLowerCase().split(" ")) {
-                c.output(word);
-            }
-        }
     }
 }
