@@ -3,6 +3,7 @@ import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
+import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.transforms.*;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
@@ -36,7 +37,7 @@ public class WordCount0JPV {
         PipelineOptions options = PipelineOptionsFactory.create();
         Pipeline p = Pipeline.create(options);
 
-        p
+        PCollection<String> result =  p
                 .apply(Create.of(input))
                 .apply(ParDo.of(new WordParser()))
                 .apply(ParDo.of(new DoFn<String, String>() {
@@ -57,10 +58,11 @@ public class WordCount0JPV {
                         Long count = kv.getValue();
                         c.output(word + " " + count);
                     }
-                }))
-                .apply(TextIO.write().to("output.txt"));
+                }));
 
-        p.run();
+        PAssert.that(result).containsInAnyOrder(expected);
+
+        p.run().waitUntilFinish();
     }
 
     public static class WordParser extends DoFn<String, String> {
