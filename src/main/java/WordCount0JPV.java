@@ -5,6 +5,7 @@ import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.transforms.*;
 import org.apache.beam.sdk.values.KV;
+import org.apache.beam.sdk.values.PCollection;
 
 import java.util.List;
 
@@ -35,14 +36,17 @@ public class WordCount0JPV {
         PipelineOptions options = PipelineOptionsFactory.create();
         Pipeline p = Pipeline.create(options);
 
-        p.apply(Create.of(input))
+        p
+                .apply(Create.of(input))
                 .apply(ParDo.of(new WordParser()))
-                .apply(Combine.perKey(Sum.ofIntegers()))
-                .apply(ParDo.of(new DoFn<KV<String,Integer>, String>() {
+                .apply(Count.perElement())
+                .apply(ParDo.of(new DoFn<KV<String,Long>, String>() {
                     @ProcessElement
                     public void processElement(ProcessContext c) {
-                        String out = c.element().getKey() + " " + c.element().getValue();
-                        c.output(out);
+                        KV<String, Long> kv = c.element();
+                        String word = kv.getKey();
+                        Long count = kv.getValue();
+                        c.output(word + " " + count);
                     }
                 }))
                 .apply(TextIO.write().to("output.txt"));
@@ -50,13 +54,12 @@ public class WordCount0JPV {
         p.run();
     }
 
-    public static class WordParser extends DoFn<String, KV<String, Integer>> {
+    public static class WordParser extends DoFn<String, String> {
         @ProcessElement
         public void processElement(ProcessContext c) {
-            String[] words = c.element().split(" ");
-            for (int i = 0; i < words.length; i++) {
-                KV<String, Integer> pair = KV.of(words[i].toLowerCase(), 1);
-                c.output(pair);
+            String line = c.element();
+            for (String word : line.toLowerCase().split(" ")) {
+                c.output(word);
             }
         }
     }
