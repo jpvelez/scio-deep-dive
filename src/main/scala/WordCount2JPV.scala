@@ -1,4 +1,5 @@
 import WordCount0.{SimpleDoFn, expected, input}
+import org.apache.beam.sdk.transforms._
 import org.apache.beam.sdk.Pipeline
 import org.apache.beam.sdk.options.{PipelineOptions, PipelineOptionsFactory}
 import org.apache.beam.sdk.testing.PAssert
@@ -26,32 +27,28 @@ object WordCount2JPV {
   }
 
   class SCollection[A](val p: PCollection[A]) {
+    def applyTransform[B](t: PTransform[PCollection[A], PCollection[B]])
+    : SCollection[B] = {
+      new SCollection(p.apply(t))
+    }
     def flatMap[B](doFn: (A => Iterable[B])): SCollection[B] = {
       val col = p.apply(ParDo.of(new SimpleDoFn[A, B]("flatMap") {
-        override def process(c: DoFn[A,B]#ProcessContext) = {
+        override def process(c: DoFn[A,B]#ProcessContext) =
           doFn(c.element()).foreach(c.output(_))
-        }
-        new SCollection[B](col)
       }))
+      new SCollection(col)
     }
   }
 
   def main(args: Array[String]): Unit = {
     val sc = ScioContext(args)
-    val result: PCollection[String] = sc.parallelize(input.asScala)
+    val result = sc.parallelize(input.asScala)
       .flatMap(s => s.toLowerCase.split(" "))
       .flatMap(s => if (!s.isEmpty) Some(s) else None)
-      .apply(Count.perElement())
-      .apply(ParDo.of(new SimpleDoFn[KV[String, java.lang.Long], String]("map") {
-        override def process(c: DoFn[KV[String, java.lang.Long], String]#ProcessContext) {
-          val kv = c.element()
-          val word = kv.getKey()
-          val count = kv.getValue()
-          c.output(word + " " + count)
-        }
-      }))
+      .applyTransform(Count.perElement())
+      .flatMap((kv: KV[String, java.lang.Long]) => Some(kv.getKey + " " + kv.getValue))
 
-    PAssert.that(result).containsInAnyOrder(expected)
+    PAssert.that(result.p).containsInAnyOrder(expected)
 
     sc.close()
   }
