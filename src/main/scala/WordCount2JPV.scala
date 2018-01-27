@@ -31,10 +31,10 @@ object WordCount2JPV {
     : SCollection[B] = {
       new SCollection(p.apply(t))
     }
-    def flatMap[B](doFn: (A => Iterable[B])): SCollection[B] = {
+    def flatMap[B](doFn: A => TraversableOnce[B]): SCollection[B] = {
       val col = p.apply(ParDo.of(new SimpleDoFn[A, B]("flatMap") {
         override def process(c: DoFn[A,B]#ProcessContext) =
-          doFn(c.element()).foreach(c.output(_))
+          doFn(c.element()).foreach(c.output)
       }))
       new SCollection(col)
     }
@@ -46,7 +46,9 @@ object WordCount2JPV {
       .flatMap(s => s.toLowerCase.split(" "))
       .flatMap(s => if (!s.isEmpty) Some(s) else None)
       .applyTransform(Count.perElement())
-      .flatMap((kv: KV[String, java.lang.Long]) => Some(kv.getKey + " " + kv.getValue))
+      .flatMap { kv =>
+        Some(kv.getKey + " " + kv.getValue)
+      }
 
     PAssert.that(result.p).containsInAnyOrder(expected)
 
