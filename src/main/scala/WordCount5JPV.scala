@@ -17,7 +17,7 @@ object WordCount5JPV {
     val pipeline: Pipeline = Pipeline.create(options)
     def close() = pipeline.run()
 
-    def parallelize[A](input: Iterable[A]): SCollection[A] = {
+    def parallelize[A: ClassTag](input: Iterable[A]): SCollection[A] = {
       val p = pipeline.apply(Create.of(input.asJava))
       new SCollection[A](p)
     }
@@ -28,8 +28,10 @@ object WordCount5JPV {
   }
 
 
-  class SCollection[A](val internal: PCollection[A]) {
-    def applyTransform[B](t: PTransform[PCollection[A], PCollection[B]]) : SCollection[B] =
+  class SCollection[A: ClassTag](val internal: PCollection[A]) {
+    val ct = implicitly[ClassTag[A]]
+
+    def applyTransform[B: ClassTag](t: PTransform[PCollection[A], PCollection[B]]) : SCollection[B] =
       new SCollection(internal.apply(t))
 
     def map[B: ClassTag](f: A => B): SCollection[B] = flatMap((x: A) => Some(f(x)))
