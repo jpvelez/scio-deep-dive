@@ -27,15 +27,18 @@ object WordCount4JPV {
     def apply(args: Array[String]): ScioContext = new ScioContext(args)
   }
 
+
   class SCollection[A](val internal: PCollection[A]) {
-    def applyTransform[B](t: PTransform[PCollection[A], PCollection[B]])
-    : SCollection[B] = {
+    def applyTransform[B](t: PTransform[PCollection[A], PCollection[B]]) : SCollection[B] =
       new SCollection(internal.apply(t))
-    }
-    def flatMap[B: ClassTag](doFn: A => TraversableOnce[B]): SCollection[B] = {
+
+
+    def map[B: ClassTag](f: A => B): SCollection[B] = flatMap((x: A) => Some(f(x)))
+
+    def flatMap[B: ClassTag](f: A => TraversableOnce[B]): SCollection[B] = {
       val p = internal.apply(ParDo.of(new SimpleDoFn[A, B]("flatMap") {
         override def process(c: DoFn[A,B]#ProcessContext) =
-          doFn(c.element()).foreach(c.output)
+          f(c.element()).foreach(c.output)
       }))
       val cls = implicitly[ClassTag[B]].runtimeClass.asInstanceOf[Class[B]]
       val coder = internal.getPipeline.getCoderRegistry.getCoder(cls)
@@ -43,9 +46,6 @@ object WordCount4JPV {
       new SCollection(p)
     }
 
-    def map[B](doFn: A => B): SCollection[B] = {
-      flatMap((x: A) => Iterable(doFn(x)))
-    }
   }
 
   def main(args: Array[String]): Unit = {
