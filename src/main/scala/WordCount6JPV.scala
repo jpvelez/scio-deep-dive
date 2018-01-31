@@ -38,8 +38,6 @@ object WordCount6JPV {
 
     def filter(f: A => Boolean): SCollection[A] = flatMap(x => if (f(x)) Some(x) else None )
 
-    def countByValue = applyTransform(Count.perElement())
-
     def flatMap[B: ClassTag](f: A => TraversableOnce[B]): SCollection[B] = {
       val p = internal.apply(ParDo.of(new SimpleDoFn[A, B]("flatMap") {
         override def process(c: DoFn[A,B]#ProcessContext) =
@@ -51,6 +49,9 @@ object WordCount6JPV {
       new SCollection(p)
     }
 
+    def countByValue: SCollection[(A, Long)] =
+      applyTransform(Count.perElement()).map[(A, Long)](kv => (kv.getKey, kv.getValue))
+
   }
 
   def main(args: Array[String]): Unit = {
@@ -59,7 +60,7 @@ object WordCount6JPV {
       .flatMap(s => s.toLowerCase.split(" "))
       .filter(_.nonEmpty)
       .countByValue
-      .map(kv => kv.getKey + " " + kv.getValue)
+      .map(kv => kv._1 + " " + kv._2)
 
     PAssert.that(result.internal).containsInAnyOrder(expected)
 
