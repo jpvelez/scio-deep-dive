@@ -48,8 +48,14 @@ object WordCount8JPV {
         override def process(c: DoFn[A,B]#ProcessContext) =
           f(c.element()).foreach(c.output)
       }))
-      val coder = new KryoCoder[B]()
-      p.setCoder(coder)
+      val cls = implicitly[ClassTag[B]].runtimeClass.asInstanceOf[Class[B]]
+      val coder = internal.getPipeline.getCoderRegistry.getCoder(cls)
+      if (coder.getClass != classOf[SerializableCoder[_]]) {
+        p.setCoder(coder)
+      } else {
+        println((s"Using KryoAtomicCoder of type $cls"))
+        p.setCoder(new KryoAtomicCoder[B]())
+      }
       new SCollection(p)
     }
 
@@ -58,18 +64,17 @@ object WordCount8JPV {
 
   }
 
-  class KryoCoder[A : ClassTag] extends AtomicCoder[A] {
+  class KryoAtomicCoder[A : ClassTag] extends AtomicCoder[A] {
     val kryo = new Kryo()
-    val clazz = implicitly[ClassTag[A]].runtimeClass.asInstanceOf[Class[A]]
 
     def encode(value: A, outStream: OutputStream): Unit = {
       val out = new Output(outStream)
-      kryo.writeObject(out,value)
+      kryo.writeClassAndObject(out,value)
     }
 
     def decode(inStream: InputStream): A = {
       val in = new Input(inStream)
-      return kryo.readObject(in, clazz)
+      return kryo.readClassAndObject(in).asInstanceOf[A]
     }
   }
 
