@@ -3,6 +3,7 @@ import java.io.{InputStream, OutputStream}
 import WordCount0.{SimpleDoFn, expected, input}
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{Input, Output}
+import com.twitter.chill.KryoSerializer
 import org.apache.beam.sdk.transforms._
 import org.apache.beam.sdk.Pipeline
 import org.apache.beam.sdk.coders.{AtomicCoder, SerializableCoder}
@@ -10,6 +11,7 @@ import org.apache.beam.sdk.options.{PipelineOptions, PipelineOptionsFactory}
 import org.apache.beam.sdk.testing.PAssert
 import org.apache.beam.sdk.transforms.Create
 import org.apache.beam.sdk.transforms.{Count, DoFn, ParDo}
+import org.apache.beam.sdk.util.EmptyOnDeserializationThreadLocal
 import org.apache.beam.sdk.values.{KV, PCollection}
 
 import scala.collection.JavaConverters._
@@ -65,16 +67,18 @@ object WordCount8JPV {
   }
 
   class KryoAtomicCoder[A : ClassTag] extends AtomicCoder[A] {
-    val kryo = new Kryo()
+    val kryo: ThreadLocal[Kryo] = new EmptyOnDeserializationThreadLocal[Kryo] {
+      override def initialValue(): Kryo = KryoSerializer.registered.newKryo()
+    }
 
     def encode(value: A, outStream: OutputStream): Unit = {
       val out = new Output(outStream)
-      kryo.writeClassAndObject(out,value)
+      kryo.get.writeClassAndObject(out,value)
     }
 
     def decode(inStream: InputStream): A = {
       val in = new Input(inStream)
-      return kryo.readClassAndObject(in).asInstanceOf[A]
+      return kryo.get.readClassAndObject(in).asInstanceOf[A]
     }
   }
 
