@@ -67,18 +67,13 @@ object WordCount9JPV {
 
   }
 
-  implicit def SCollectionToPair[A: ClassTag,B: ClassTag](s: SCollection[(A,B)]): PairSCollection[A,B] =
-    new PairSCollection[A,B](s.internal)
+  implicit class PairSCollection[K: ClassTag, V: ClassTag](self: SCollection[(K,V)]) {
 
-
-
-  class PairSCollection[A: ClassTag, B: ClassTag](internal: PCollection[(A,B)]) extends SCollection(internal) {
-
-    def groupByKey(): SCollection[(A, Iterable[B])] = {
-        map[KV[A,B]] { case (k,v) => KV.of(k,v) }
+    def groupByKey(): SCollection[(K, Iterable[V])] =
+      self
+        .map[KV[K,V]] { case (k,v) => KV.of(k,v) }
         .applyTransform(GroupByKey.create())
         .map(kv => (kv.getKey, kv.getValue.asScala))
-      }
     }
 
   class KryoAtomicCoder[A : ClassTag] extends AtomicCoder[A] {
