@@ -67,18 +67,17 @@ object WordCount9JPV {
 
   }
 
-  implicit def SCollectionToPair[A,B](s: SCollection[(A,B)]): PairSCollection[A,B] =
+  implicit def SCollectionToPair[A: ClassTag,B: ClassTag](s: SCollection[(A,B)]): PairSCollection[A,B] =
     new PairSCollection[A,B](s.internal)
 
 
 
-  class PairSCollection[A,B](internal: PCollection[(A,B)]) extends SCollection(internal) {
+  class PairSCollection[A: ClassTag, B: ClassTag](internal: PCollection[(A,B)]) extends SCollection(internal) {
 
     def groupByKey(): SCollection[(A, Iterable[B])] = {
-        val p = map[KV[A,B]] { case (k,v) => KV.of(k,v) }
-        .internal.apply(GroupByKey.create())
-        new SCollection[KV[A, java.lang.Iterable[B]]](p)
-          .map(kv => (kv.getKey, kv.getValue.asScala))
+        map[KV[A,B]] { case (k,v) => KV.of(k,v) }
+        .applyTransform(GroupByKey.create())
+        .map(kv => (kv.getKey, kv.getValue.asScala))
       }
     }
 
